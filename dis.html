@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Distance Calculator</title>
+</head>
+<body>
+
+<h2>Distance Between Two Places</h2>
+
+<input id="from" placeholder="From place" oninput="suggest(this, 'fromList')">
+<ul id="fromList"></ul>
+
+<input id="to" placeholder="To place" oninput="suggest(this, 'toList')">
+<ul id="toList"></ul>
+
+<button onclick="calculateDistance()">Calculate Distance</button>
+
+<p id="result"></p>
+
+<script>
+// -------- AUTOCOMPLETE --------
+async function suggest(input, listId) {
+  const query = input.value;
+  const list = document.getElementById(listId);
+
+  if (query.length < 3) {
+    list.innerHTML = "";
+    return;
+  }
+
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  list.innerHTML = "";
+
+  data.forEach(place => {
+    const li = document.createElement("li");
+    li.textContent = place.display_name;
+
+    li.onclick = () => {
+      input.value = place.display_name;
+      list.innerHTML = "";
+    };
+
+    list.appendChild(li);
+  });
+}
+
+// -------- GEOCODING --------
+async function geocode(place) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(place)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.length === 0) throw "Place not found";
+
+  return {
+    lat: parseFloat(data[0].lat),
+    lng: parseFloat(data[0].lon)
+  };
+}
+
+// -------- DISTANCE (HAVERSINE) --------
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat/2) ** 2 +
+    Math.cos(lat1 * Math.PI/180) *
+    Math.cos(lat2 * Math.PI/180) *
+    Math.sin(dLon/2) ** 2;
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// -------- MAIN --------
+async function calculateDistance() {
+  const from = document.getElementById("from").value;
+  const to = document.getElementById("to").value;
+  const result = document.getElementById("result");
+
+  if (!from || !to) {
+    result.innerText = "Enter both places";
+    return;
+  }
+
+  result.innerText = "Calculating...";
+
+  try {
+    const start = await geocode(from);
+    const end = await geocode(to);
+
+    const distance = haversine(
+      start.lat, start.lng,
+      end.lat, end.lng
+    );
+
+    result.innerHTML = `
+      Distance between <b>${from}</b> and <b>${to}</b> is
+      <b>${distance.toFixed(2)} km</b>
+    `;
+  } catch {
+    result.innerText = "Error calculating distance";
+  }
+}
+</script>
+
+</body>
+</html>
